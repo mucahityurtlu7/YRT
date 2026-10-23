@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -34,13 +36,14 @@ import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
@@ -62,6 +65,7 @@ import com.yrt.music.ui.components.StreamingTrackRow
 import com.yrt.music.ui.components.TrackDownloadState
 
 /** The live, public YouTube Music feed shown when the search field is empty. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverContent(
     state: DiscoveryUiState,
@@ -80,128 +84,131 @@ fun DiscoverContent(
         DiscoverHeader(
             title = if (state.canGoBack) state.page?.title ?: "Keşfet" else "Keşfet",
             canGoBack = state.canGoBack,
-            isLoading = state.isLoading,
             onBack = onBack,
-            onRefresh = onRefresh,
         )
-        if (state.isLoading && state.page != null) {
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
-        }
 
-        when {
-            state.page == null && state.isLoading -> DiscoveryLoading(Modifier.weight(1f))
-            state.page == null && state.errorMessage != null -> DiscoveryMessage(
-                title = "Keşfet yüklenemedi",
-                message = state.errorMessage,
-                onRetry = onRetry,
-                modifier = Modifier.weight(1f),
-            )
-            state.page?.sections.isNullOrEmpty() -> DiscoveryMessage(
-                title = "Burada henüz içerik yok",
-                message = "Yeni müzikler için sayfayı yeniden yükle.",
-                onRetry = onRetry,
-                modifier = Modifier.weight(1f),
-            )
-            else -> key(state.page.title, state.canGoBack) {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (state.errorMessage != null) {
-                        item(key = "discovery_refresh_error") {
-                            DiscoveryRefreshError(state.errorMessage, onRetry)
-                        }
-                    }
-                    state.page.sections.forEachIndexed { sectionIndex, section ->
-                        val sectionKey = "${sectionIndex}_${section.id}"
-                        val isRootMenu = !state.canGoBack && section.title == state.page.title &&
-                            section.items.size <= 6 && section.items.all { it.kind == DiscoveryItemKind.CATEGORY }
-                        if (!isRootMenu) {
-                            item(key = "${sectionKey}_header") {
-                                DiscoverySectionHeader(section, onMoreClick)
+        PullToRefreshBox(
+            isRefreshing = state.isLoading && (state.page != null || state.errorMessage != null),
+            onRefresh = onRefresh,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+        ) {
+            when {
+                state.page == null && state.isLoading -> DiscoveryLoading(Modifier.fillMaxSize())
+                state.page == null && state.errorMessage != null -> DiscoveryMessage(
+                    title = "Keşfet yüklenemedi",
+                    message = state.errorMessage,
+                    onRetry = onRetry,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                )
+                state.page?.sections.isNullOrEmpty() -> DiscoveryMessage(
+                    title = "Burada henüz içerik yok",
+                    message = "Yeni müzikler için sayfayı yeniden yükle.",
+                    onRetry = onRetry,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                )
+                else -> key(state.page.title, state.canGoBack) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 28.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (state.errorMessage != null) {
+                            item(key = "discovery_refresh_error") {
+                                DiscoveryRefreshError(state.errorMessage, onRetry)
                             }
                         }
-                        when {
-                            section.items.all { it.kind == DiscoveryItemKind.TRACK } -> {
-                                items(
-                                    items = section.items,
-                                    key = { "${sectionKey}_${it.id}" },
-                                ) { item ->
-                                    StreamingTrackRow(
-                                        title = item.title,
-                                        artist = item.subtitle ?: item.track?.artist,
-                                        thumbnailUrl = item.artworkUrl ?: item.track?.thumbnailUrl,
-                                        durationMs = item.track?.durationMs ?: 0L,
-                                        durationText = item.track?.durationText,
-                                        downloadState = item.track?.videoId?.let(trackDownloadState)
-                                            ?: TrackDownloadState.NotDownloaded,
-                                        onClick = { onItemClick(item) },
-                                        onDownloadClick = if (item.track != null && onDownloadTrack != null) {
-                                            { onDownloadTrack(item.track) }
-                                        } else null,
-                                    )
+                        state.page.sections.forEachIndexed { sectionIndex, section ->
+                            val sectionKey = "${sectionIndex}_${section.id}"
+                            val isRootMenu = !state.canGoBack && section.title == state.page.title &&
+                                section.items.size <= 6 && section.items.all { it.kind == DiscoveryItemKind.CATEGORY }
+                            if (!isRootMenu) {
+                                item(key = "${sectionKey}_header") {
+                                    DiscoverySectionHeader(section, onMoreClick)
                                 }
                             }
-                            section.items.all { it.kind == DiscoveryItemKind.CATEGORY } -> {
-                                if (!state.canGoBack && section.items.size > 6) {
-                                    item(key = "${sectionKey}_category_shelf") {
-                                        LazyRow(
-                                            contentPadding = PaddingValues(horizontal = 20.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        ) {
-                                            items(section.items.chunked(2)) { column ->
-                                                Column(
-                                                    modifier = Modifier.width(166.dp),
-                                                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                                                ) {
-                                                    column.forEach { item ->
-                                                        DiscoveryCategoryCard(
-                                                            item = item,
-                                                            onClick = { onItemClick(item) },
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                        )
+                            when {
+                                section.items.all { it.kind == DiscoveryItemKind.TRACK } -> {
+                                    items(
+                                        items = section.items,
+                                        key = { "${sectionKey}_${it.id}" },
+                                    ) { item ->
+                                        StreamingTrackRow(
+                                            title = item.title,
+                                            artist = item.subtitle ?: item.track?.artist,
+                                            thumbnailUrl = item.artworkUrl ?: item.track?.thumbnailUrl,
+                                            durationMs = item.track?.durationMs ?: 0L,
+                                            durationText = item.track?.durationText,
+                                            downloadState = item.track?.videoId?.let(trackDownloadState)
+                                                ?: TrackDownloadState.NotDownloaded,
+                                            onClick = { onItemClick(item) },
+                                            onDownloadClick = if (item.track != null && onDownloadTrack != null) {
+                                                { onDownloadTrack(item.track) }
+                                            } else null,
+                                        )
+                                    }
+                                }
+                                section.items.all { it.kind == DiscoveryItemKind.CATEGORY } -> {
+                                    if (!state.canGoBack && section.items.size > 6) {
+                                        item(key = "${sectionKey}_category_shelf") {
+                                            LazyRow(
+                                                contentPadding = PaddingValues(horizontal = 20.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            ) {
+                                                items(section.items.chunked(2)) { column ->
+                                                    Column(
+                                                        modifier = Modifier.width(166.dp),
+                                                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                                                    ) {
+                                                        column.forEach { item ->
+                                                            DiscoveryCategoryCard(
+                                                                item = item,
+                                                                onClick = { onItemClick(item) },
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
-                                    }
-                                } else {
-                                    section.items.chunked(2).forEachIndexed { rowIndex, row ->
-                                        item(key = "${sectionKey}_categories_$rowIndex") {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                            ) {
-                                                row.forEach { item ->
-                                                    DiscoveryCategoryCard(
-                                                        item = item,
-                                                        onClick = { onItemClick(item) },
-                                                        modifier = Modifier.weight(1f),
-                                                    )
+                                    } else {
+                                        section.items.chunked(2).forEachIndexed { rowIndex, row ->
+                                            item(key = "${sectionKey}_categories_$rowIndex") {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                                ) {
+                                                    row.forEach { item ->
+                                                        DiscoveryCategoryCard(
+                                                            item = item,
+                                                            onClick = { onItemClick(item) },
+                                                            modifier = Modifier.weight(1f),
+                                                        )
+                                                    }
+                                                    if (row.size == 1) Spacer(Modifier.weight(1f))
                                                 }
-                                                if (row.size == 1) Spacer(Modifier.weight(1f))
                                             }
                                         }
                                     }
                                 }
-                            }
-                            else -> item(key = "${sectionKey}_cards") {
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 20.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                ) {
-                                    items(section.items, key = { it.id }) { item ->
-                                        DiscoveryArtworkCard(item, onClick = { onItemClick(item) })
+                                else -> item(key = "${sectionKey}_cards") {
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 20.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    ) {
+                                        items(section.items, key = { it.id }) { item ->
+                                            DiscoveryArtworkCard(item, onClick = { onItemClick(item) })
+                                        }
                                     }
                                 }
                             }
+                            item(key = "${sectionKey}_spacer") { Spacer(Modifier.height(8.dp)) }
                         }
-                        item(key = "${sectionKey}_spacer") { Spacer(Modifier.height(8.dp)) }
                     }
                 }
             }
@@ -213,9 +220,7 @@ fun DiscoverContent(
 private fun DiscoverHeader(
     title: String,
     canGoBack: Boolean,
-    isLoading: Boolean,
     onBack: () -> Unit,
-    onRefresh: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = if (canGoBack) 8.dp else 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
@@ -258,13 +263,6 @@ private fun DiscoverHeader(
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
-        }
-        IconButton(onClick = onRefresh, enabled = !isLoading) {
-            Icon(
-                Icons.Default.Refresh,
-                contentDescription = "Keşfeti yenile",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (isLoading) 0.35f else 1f),
-            )
         }
     }
 }

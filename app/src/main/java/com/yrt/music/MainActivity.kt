@@ -51,11 +51,13 @@ import com.yrt.music.ui.library.LibraryViewModel
 import com.yrt.music.ui.player.PlayerScreen
 import com.yrt.music.ui.player.PlayerViewModel
 import com.yrt.music.ui.search.SearchViewModel
+import com.yrt.music.ui.settings.SettingsViewModel
 import com.yrt.music.ui.theme.YrtTheme
 
 class MainActivity : ComponentActivity() {
 
     private val downloaderVm: DownloaderViewModel by viewModels()
+    private val settingsVm: SettingsViewModel by viewModels()
     private val libraryVm: LibraryViewModel by viewModels()
     private val playerVm: PlayerViewModel by viewModels()
     private val searchVm: SearchViewModel by viewModels {
@@ -66,9 +68,6 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    /** Bumped whenever a share intent arrives so the UI switches to the download tab. */
-    private val shareSignal = mutableStateOf(0)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -77,7 +76,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             YrtTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    AppRoot(downloaderVm, libraryVm, playerVm, searchVm, shareSignal.value)
+                    AppRoot(downloaderVm, settingsVm, libraryVm, playerVm, searchVm)
                 }
             }
         }
@@ -92,7 +91,6 @@ class MainActivity : ComponentActivity() {
         if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             intent.getStringExtra(Intent.EXTRA_TEXT)?.let {
                 downloaderVm.onSharedText(it)
-                shareSignal.value++
             }
         }
     }
@@ -101,31 +99,21 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppRoot(
     downloaderVm: DownloaderViewModel,
+    settingsVm: SettingsViewModel,
     libraryVm: LibraryViewModel,
     playerVm: PlayerViewModel,
     searchVm: SearchViewModel,
-    shareSignal: Int,
 ) {
     val navController = rememberNavController()
     var showPlayer by rememberSaveable { mutableStateOf(false) }
     val playerState by playerVm.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
 
-    LaunchedEffect(shareSignal) {
-        if (shareSignal > 0) {
-            showPlayer = false
-            navController.navigate(Screen.Downloads.route) {
-                popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = true
-                }
-                launchSingleTop = true
-                restoreState = true
-            }
-        }
-    }
-
     LaunchedEffect(Unit) {
         downloaderVm.messages.collect { snackbar.showSnackbar(it) }
+    }
+    LaunchedEffect(Unit) {
+        settingsVm.messages.collect { snackbar.showSnackbar(it) }
     }
 
     // Android 13+: media / download notifications need runtime permission
@@ -184,7 +172,7 @@ private fun AppRoot(
             AppNavHost(
                 navController = navController,
                 libraryVm = libraryVm,
-                downloaderVm = downloaderVm,
+                settingsVm = settingsVm,
                 playerVm = playerVm,
                 searchVm = searchVm,
                 contentPadding = padding,

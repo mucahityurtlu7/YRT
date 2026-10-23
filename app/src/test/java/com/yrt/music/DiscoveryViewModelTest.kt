@@ -98,6 +98,33 @@ class DiscoveryViewModelTest {
         } finally { h.close() }
     }
 
+    @Test fun pullToRefreshConditionIsMetDuringRefresh() = runTest {
+        val h = Harness(StandardTestDispatcher(testScheduler))
+        try {
+            h.vm.ensureLoaded().join()
+            val stateBefore = h.vm.uiState.value
+            assertNotNull(stateBefore.page)
+            assertFalse(stateBefore.isLoading)
+
+            // During pull-to-refresh
+            h.service.hold = CompletableDeferred()
+            val refreshJob = h.vm.refresh()
+            runCurrent()
+
+            val stateRefreshing = h.vm.uiState.value
+            assertTrue("State must be loading while refreshing", stateRefreshing.isLoading)
+            assertNotNull("Page must be retained so list stays visible while spinner animates", stateRefreshing.page)
+            assertTrue("Pull to refresh condition must be true", stateRefreshing.isLoading && (stateRefreshing.page != null || stateRefreshing.errorMessage != null))
+
+            h.service.hold!!.complete(Unit)
+            refreshJob.join()
+
+            val stateAfter = h.vm.uiState.value
+            assertFalse("Loading must be false after refresh completes", stateAfter.isLoading)
+            assertFalse("Pull to refresh condition must be false when refresh completes", stateAfter.isLoading && (stateAfter.page != null || stateAfter.errorMessage != null))
+        } finally { h.close() }
+    }
+
     @Test fun networkFailureDoesNotPretendThereAreRecommendationsAndRetryRecovers() = runTest {
         val h = Harness(StandardTestDispatcher(testScheduler))
         try {

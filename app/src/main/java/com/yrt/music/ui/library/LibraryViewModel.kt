@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.yrt.music.YrtApp
 import com.yrt.music.data.model.Song
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -60,8 +61,20 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
-    fun refresh() {
-        viewModelScope.launch { repository.refresh() }
+    var isRefreshing by mutableStateOf(false)
+        private set
+    private var refreshJob: Job? = null
+
+    fun refresh(): Job {
+        refreshJob?.takeIf { it.isActive }?.let { return it }
+        return viewModelScope.launch {
+            isRefreshing = true
+            try {
+                repository.refresh()
+            } finally {
+                isRefreshing = false
+            }
+        }.also { refreshJob = it }
     }
 
     fun delete(song: Song) {

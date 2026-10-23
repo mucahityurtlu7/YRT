@@ -1,7 +1,7 @@
 package com.yrt.music
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
@@ -37,7 +37,7 @@ class AdversarialM3NavigationAndPlayerTest {
         val allRoutes = listOf(
             Screen.Search.route,
             Screen.Library.route,
-            Screen.Downloads.route,
+            Screen.Settings.route,
             Screen.Artist.route,
             Screen.Album.route,
         )
@@ -46,7 +46,7 @@ class AdversarialM3NavigationAndPlayerTest {
 
         assertEquals("search", Screen.Search.route)
         assertEquals("library", Screen.Library.route)
-        assertEquals("downloads", Screen.Downloads.route)
+        assertEquals("settings", Screen.Settings.route)
         assertEquals("artist/{artistId}", Screen.Artist.route)
         assertEquals("album/{albumId}", Screen.Album.route)
 
@@ -117,7 +117,7 @@ class AdversarialM3NavigationAndPlayerTest {
      * Route parsing oracle verifying Navigation Compose path-matching mechanics:
      * - Route "artist/{artistId}" matches "artist/<segment>"
      * - Route "album/{albumId}" matches "album/<segment>"
-     * - Static routes "search", "library", "downloads" match exactly
+     * - Static routes "search", "library", "settings" match exactly
      */
     private object NavRouteOracle {
         private val artistPattern = Pattern.compile("^artist/([^/]+)$")
@@ -127,7 +127,7 @@ class AdversarialM3NavigationAndPlayerTest {
             return when {
                 constructedRoute == Screen.Search.route -> Screen.Search to emptyMap()
                 constructedRoute == Screen.Library.route -> Screen.Library to emptyMap()
-                constructedRoute == Screen.Downloads.route -> Screen.Downloads to emptyMap()
+                constructedRoute == Screen.Settings.route -> Screen.Settings to emptyMap()
                 else -> {
                     val artistMatcher = artistPattern.matcher(constructedRoute)
                     if (artistMatcher.matches()) {
@@ -150,7 +150,7 @@ class AdversarialM3NavigationAndPlayerTest {
         // Test static routes
         assertEquals(Screen.Search, NavRouteOracle.matchRoute("search")?.first)
         assertEquals(Screen.Library, NavRouteOracle.matchRoute("library")?.first)
-        assertEquals(Screen.Downloads, NavRouteOracle.matchRoute("downloads")?.first)
+        assertEquals(Screen.Settings, NavRouteOracle.matchRoute("settings")?.first)
 
         // Test parameterized artist routes
         val artistMatch = NavRouteOracle.matchRoute(Screen.Artist.createRoute("UC_Daft_Punk"))
@@ -170,7 +170,7 @@ class AdversarialM3NavigationAndPlayerTest {
         assertNull("Prefix only 'artist' should not match parameterized route", NavRouteOracle.matchRoute("artist"))
         assertNull("Prefix only 'album' should not match parameterized route", NavRouteOracle.matchRoute("album"))
         assertNull("Multi-segment 'artist/a/b' should not match single segment", NavRouteOracle.matchRoute("artist/a/b"))
-        assertNull("Unknown route 'settings' should not match", NavRouteOracle.matchRoute("settings"))
+        assertNull("Unknown route 'downloads' should not match", NavRouteOracle.matchRoute("downloads"))
         assertNull("Empty route should not match", NavRouteOracle.matchRoute(""))
     }
 
@@ -180,7 +180,7 @@ class AdversarialM3NavigationAndPlayerTest {
 
     @Test
     fun testMainNavTabsCompletenessAndIcons() {
-        assertEquals(3, MainNavTabs.size)
+        assertEquals(2, MainNavTabs.size)
 
         assertEquals(Screen.Search, MainNavTabs[0].screen)
         assertEquals("Keşfet", MainNavTabs[0].title)
@@ -189,10 +189,6 @@ class AdversarialM3NavigationAndPlayerTest {
         assertEquals(Screen.Library, MainNavTabs[1].screen)
         assertEquals("Kitaplık", MainNavTabs[1].title)
         assertEquals(Icons.Default.LibraryMusic, MainNavTabs[1].icon)
-
-        assertEquals(Screen.Downloads, MainNavTabs[2].screen)
-        assertEquals("İndirilenler", MainNavTabs[2].title)
-        assertEquals(Icons.Default.Download, MainNavTabs[2].icon)
     }
 
     @Test
@@ -206,26 +202,21 @@ class AdversarialM3NavigationAndPlayerTest {
         // When on Search
         assertTrue(isTabSelected("search", Screen.Search))
         assertFalse(isTabSelected("search", Screen.Library))
-        assertFalse(isTabSelected("search", Screen.Downloads))
 
         // When on Library
         assertFalse(isTabSelected("library", Screen.Search))
         assertTrue(isTabSelected("library", Screen.Library))
-        assertFalse(isTabSelected("library", Screen.Downloads))
 
-        // When on Downloads
-        assertFalse(isTabSelected("downloads", Screen.Search))
-        assertFalse(isTabSelected("downloads", Screen.Library))
-        assertTrue(isTabSelected("downloads", Screen.Downloads))
+        // When on Settings (opened via top bar), neither tab is selected
+        assertFalse(isTabSelected("settings", Screen.Search))
+        assertFalse(isTabSelected("settings", Screen.Library))
 
         // When on detail screens (Artist / Album), no bottom nav tab is selected
         assertFalse(isTabSelected("artist/UC123", Screen.Search))
         assertFalse(isTabSelected("artist/UC123", Screen.Library))
-        assertFalse(isTabSelected("artist/UC123", Screen.Downloads))
 
         assertFalse(isTabSelected("album/MPRE456", Screen.Search))
         assertFalse(isTabSelected("album/MPRE456", Screen.Library))
-        assertFalse(isTabSelected("album/MPRE456", Screen.Downloads))
     }
 
     // =========================================================================
@@ -347,10 +338,12 @@ class AdversarialM3NavigationAndPlayerTest {
         assertEquals("library", nav.currentDestination)
         assertEquals(2, nav.backStack.size) // [search, library]
 
-        // 6. User taps "Downloads" tab from bottom navigation
-        nav.navigateTab(Screen.Downloads.route)
-        assertEquals("downloads", nav.currentDestination)
-        assertEquals(2, nav.backStack.size) // [search, downloads]
+        // 6. User taps Settings button on top-right of Library
+        nav.navigateToDetail(Screen.Settings.route)
+        assertEquals("settings", nav.currentDestination)
+        assertEquals(3, nav.backStack.size) // [search, library, settings]
+        assertTrue(nav.popBackStack())
+        assertEquals("library", nav.currentDestination)
 
         // 7. User taps "Library" tab again -> state restored, no duplicate push
         nav.navigateTab(Screen.Library.route)
@@ -362,33 +355,33 @@ class AdversarialM3NavigationAndPlayerTest {
     fun testTabNavigationIdempotencySingleTop() {
         val nav = NavControllerHarness(startDestination = Screen.Search.route)
 
-        // Navigate to Downloads
-        nav.navigateTab(Screen.Downloads.route)
-        assertEquals("downloads", nav.currentDestination)
+        // Navigate to Library
+        nav.navigateTab(Screen.Library.route)
+        assertEquals("library", nav.currentDestination)
         val initialDepth = nav.backStack.size
 
-        // Tap Downloads 20 times consecutively
+        // Tap Library 20 times consecutively
         repeat(20) {
-            nav.navigateTab(Screen.Downloads.route)
-            assertEquals("downloads", nav.currentDestination)
+            nav.navigateTab(Screen.Library.route)
+            assertEquals("library", nav.currentDestination)
             assertEquals("Backstack must not grow on repeated clicks due to launchSingleTop", initialDepth, nav.backStack.size)
         }
 
-        // Tap Library 10 times consecutively
-        nav.navigateTab(Screen.Library.route)
-        assertEquals("library", nav.currentDestination)
-        val libraryDepth = nav.backStack.size
+        // Tap Search 10 times consecutively
+        nav.navigateTab(Screen.Search.route)
+        assertEquals("search", nav.currentDestination)
+        val searchDepth = nav.backStack.size
         repeat(10) {
-            nav.navigateTab(Screen.Library.route)
-            assertEquals("library", nav.currentDestination)
-            assertEquals(libraryDepth, nav.backStack.size)
+            nav.navigateTab(Screen.Search.route)
+            assertEquals("search", nav.currentDestination)
+            assertEquals(searchDepth, nav.backStack.size)
         }
     }
 
     @Test
     fun testRapidInterleavedTabSwitchingStress() {
         val nav = NavControllerHarness(startDestination = Screen.Search.route)
-        val tabs = listOf(Screen.Search.route, Screen.Library.route, Screen.Downloads.route)
+        val tabs = listOf(Screen.Search.route, Screen.Library.route)
 
         // 300 rapid random tab switches
         val rng = java.util.Random(1337)
@@ -451,12 +444,12 @@ class AdversarialM3NavigationAndPlayerTest {
         val tabCycle = listOf(
             Screen.Search.route,
             Screen.Library.route,
-            Screen.Downloads.route,
+            Screen.Settings.route,
             Screen.Search.route,
             Screen.Artist.createRoute("daft_punk"),
             Screen.Album.createRoute("random_access_memories"),
             Screen.Library.route,
-            Screen.Downloads.route,
+            Screen.Settings.route,
         )
 
         for (dest in tabCycle) {
@@ -545,7 +538,7 @@ class AdversarialM3NavigationAndPlayerTest {
      * - Extracts EXTRA_TEXT
      * - Calls downloaderVm.onSharedText(text)
      * - Increments shareSignal
-     * - In LaunchedEffect(shareSignal): collapses showPlayer, navigates to Screen.Downloads.route
+     * - In LaunchedEffect(shareSignal): collapses showPlayer, navigates to Screen.Settings.route
      */
     private class IntentHandlerHarness {
         companion object {
@@ -602,7 +595,7 @@ class AdversarialM3NavigationAndPlayerTest {
             // LaunchedEffect(shareSignal) {
             //     if (shareSignal > 0) {
             //         showPlayer = false
-            //         navController.navigate(Screen.Downloads.route) {
+            //         navController.navigate(Screen.Settings.route) {
             //             popUpTo(navController.graph.findStartDestination().id) {
             //                 saveState = true
             //             }
@@ -613,7 +606,7 @@ class AdversarialM3NavigationAndPlayerTest {
             // }
             if (shareSignal > 0) {
                 showPlayer = false
-                nav.navigateTab(Screen.Downloads.route)
+                nav.navigateTab(Screen.Settings.route)
             }
         }
     }
@@ -636,7 +629,7 @@ class AdversarialM3NavigationAndPlayerTest {
         assertEquals(1, harness.shareSignal)
         assertEquals(listOf("https://music.youtube.com/watch?v=dQw4w9WgXcQ"), harness.sharedTexts)
         assertFalse("Full player must be collapsed when share intent arrives", harness.showPlayer)
-        assertEquals("Downloads tab must be navigated to", Screen.Downloads.route, harness.nav.currentDestination)
+        assertEquals("Downloads tab must be navigated to", Screen.Settings.route, harness.nav.currentDestination)
     }
 
     @Test
@@ -727,7 +720,7 @@ class AdversarialM3NavigationAndPlayerTest {
                 )
             )
             assertEquals(i, harness.shareSignal)
-            assertEquals(Screen.Downloads.route, harness.nav.currentDestination)
+            assertEquals(Screen.Settings.route, harness.nav.currentDestination)
         }
 
         assertEquals(50, harness.sharedTexts.size)

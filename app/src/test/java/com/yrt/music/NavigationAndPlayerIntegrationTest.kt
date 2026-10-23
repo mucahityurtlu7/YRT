@@ -1,7 +1,7 @@
 package com.yrt.music
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Explore
 import com.yrt.music.navigation.MainNavTabs
@@ -19,7 +19,7 @@ class NavigationAndPlayerIntegrationTest {
     fun testScreenRoutesContract() {
         assertEquals("search", Screen.Search.route)
         assertEquals("library", Screen.Library.route)
-        assertEquals("downloads", Screen.Downloads.route)
+        assertEquals("settings", Screen.Settings.route)
 
         assertEquals("artist/{artistId}", Screen.Artist.route)
         assertEquals("artist/UC_test_artist_123", Screen.Artist.createRoute("UC_test_artist_123"))
@@ -32,7 +32,7 @@ class NavigationAndPlayerIntegrationTest {
 
     @Test
     fun testMainNavTabsHierarchy() {
-        assertEquals(3, MainNavTabs.size)
+        assertEquals(2, MainNavTabs.size)
 
         val searchTab = MainNavTabs[0]
         assertEquals(Screen.Search, searchTab.screen)
@@ -43,11 +43,6 @@ class NavigationAndPlayerIntegrationTest {
         assertEquals(Screen.Library, libraryTab.screen)
         assertEquals("Kitaplık", libraryTab.title)
         assertEquals(Icons.Default.LibraryMusic, libraryTab.icon)
-
-        val downloadsTab = MainNavTabs[2]
-        assertEquals(Screen.Downloads, downloadsTab.screen)
-        assertEquals("İndirilenler", downloadsTab.title)
-        assertEquals(Icons.Default.Download, downloadsTab.icon)
     }
 
     @Test

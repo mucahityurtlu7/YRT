@@ -2,7 +2,7 @@ package com.yrt.music.navigation
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.runtime.Composable
@@ -23,14 +23,14 @@ import com.yrt.music.ui.album.AlbumScreen
 import com.yrt.music.ui.album.AlbumViewModel
 import com.yrt.music.ui.artist.ArtistScreen
 import com.yrt.music.ui.artist.ArtistViewModel
-import com.yrt.music.ui.downloader.DownloaderScreen
-import com.yrt.music.ui.downloader.DownloaderViewModel
 import com.yrt.music.ui.discover.DiscoveryViewModel
 import com.yrt.music.ui.library.LibraryScreen
 import com.yrt.music.ui.library.LibraryViewModel
 import com.yrt.music.ui.player.PlayerViewModel
 import com.yrt.music.ui.search.SearchScreen
 import com.yrt.music.ui.search.SearchViewModel
+import com.yrt.music.ui.settings.SettingsScreen
+import com.yrt.music.ui.settings.SettingsViewModel
 
 /**
  * Sealed destination hierarchy matching PROJECT.md § 4. Navigation Routes Contract.
@@ -38,7 +38,7 @@ import com.yrt.music.ui.search.SearchViewModel
 sealed class Screen(val route: String) {
     data object Search : Screen("search")
     data object Library : Screen("library")
-    data object Downloads : Screen("downloads")
+    data object Settings : Screen("settings")
 
     data object Artist : Screen("artist/{artistId}") {
         const val ARG_ARTIST_ID = "artistId"
@@ -63,7 +63,6 @@ data class NavTabItem(
 val MainNavTabs = listOf(
     NavTabItem(Screen.Search, "Keşfet", Icons.Default.Explore),
     NavTabItem(Screen.Library, "Kitaplık", Icons.Default.LibraryMusic),
-    NavTabItem(Screen.Downloads, "İndirilenler", Icons.Default.Download),
 )
 
 /**
@@ -73,7 +72,7 @@ val MainNavTabs = listOf(
 fun AppNavHost(
     navController: NavHostController,
     libraryVm: LibraryViewModel,
-    downloaderVm: DownloaderViewModel,
+    settingsVm: SettingsViewModel,
     playerVm: PlayerViewModel,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
@@ -128,13 +127,15 @@ fun AppNavHost(
                 contentPadding = contentPadding,
                 onPlay = { songs, index -> playerVm.playSongs(songs, index) },
                 onDeleted = { playerVm.removeFromQueue(it.id) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
             )
         }
 
-        composable(Screen.Downloads.route) {
-            DownloaderScreen(
-                vm = downloaderVm,
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                vm = settingsVm,
                 contentPadding = contentPadding,
+                onBackClick = { navController.popBackStack() },
             )
         }
 

@@ -24,7 +24,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material3.Icon
@@ -81,7 +80,6 @@ fun StreamingNavigationBar(
                     val icon = if (selected) tab.icon else when (tab.screen) {
                         Screen.Search -> Icons.Outlined.Explore
                         Screen.Library -> Icons.Outlined.LibraryMusic
-                        Screen.Downloads -> Icons.Outlined.Download
                         else -> tab.icon
                     }
                     Column(

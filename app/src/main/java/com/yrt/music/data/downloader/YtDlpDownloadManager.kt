@@ -69,6 +69,15 @@ class YtDlpDownloadManager(
     private val ytdl get() = YoutubeDL.getInstance()
     private val prefs by lazy { context?.getSharedPreferences("ytdlp", Context.MODE_PRIVATE) }
 
+    /** Whether yt-dlp should be refreshed automatically (at most once a day) after init. */
+    var autoUpdateEnabled: Boolean
+        get() = prefs?.getBoolean(KEY_AUTO_UPDATE, true) ?: true
+        set(value) { prefs?.edit()?.putBoolean(KEY_AUTO_UPDATE, value)?.apply() }
+
+    /** Epoch millis of the last successful yt-dlp update, or 0 if never. */
+    val lastUpdateMillis: Long
+        get() = prefs?.getLong(KEY_LAST_UPDATE, 0L) ?: 0L
+
     private val _engineState = MutableStateFlow<EngineState>(EngineState.Initializing)
     val engineState: StateFlow<EngineState> = _engineState.asStateFlow()
 
@@ -122,6 +131,7 @@ class YtDlpDownloadManager(
 
     private suspend fun autoUpdateIfStale() {
         val p = prefs ?: return
+        if (!autoUpdateEnabled) return
         val last = p.getLong(KEY_LAST_UPDATE, 0L)
         if (System.currentTimeMillis() - last > 24 * 60 * 60 * 1000L) {
             updateYtDlp()
@@ -546,6 +556,7 @@ class YtDlpDownloadManager(
     companion object {
         private const val TAG = "YtDlpDownloadManager"
         private const val KEY_LAST_UPDATE = "last_update"
+        private const val KEY_AUTO_UPDATE = "auto_update"
         private val DEST_REGEX = Regex("""Destination:\s+(.+)$""")
 
         private fun logError(message: String, throwable: Throwable? = null) {

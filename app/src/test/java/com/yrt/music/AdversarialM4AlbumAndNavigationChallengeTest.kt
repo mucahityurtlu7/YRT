@@ -1,7 +1,7 @@
 package com.yrt.music
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Search
 import com.yrt.music.data.downloader.YtDlpDownloadManager
@@ -576,10 +576,12 @@ class AdversarialM4AlbumAndNavigationChallengeTest {
         assertEquals("library", nav.currentDestination)
         assertEquals(2, nav.backStack.size)
 
-        // Step 9: Tab click Downloads
-        nav.navigateTab(Screen.Downloads.route)
-        assertEquals("downloads", nav.currentDestination)
-        assertEquals(2, nav.backStack.size)
+        // Step 9: Open Settings from Library
+        nav.navigateToDetail(Screen.Settings.route)
+        assertEquals("settings", nav.currentDestination)
+        assertEquals(3, nav.backStack.size)
+        assertTrue(nav.popBackStack())
+        assertEquals("library", nav.currentDestination)
 
         // Step 10: Tab click Search -> restored to start destination
         nav.navigateTab(Screen.Search.route)
@@ -652,13 +654,15 @@ class AdversarialM4AlbumAndNavigationChallengeTest {
         assertEquals(1, stateBeforeTabSwitch.albums.size)
         assertTrue(stateBeforeTabSwitch.hasSearched)
 
-        // 2. User switches tabs: Search -> Library -> Downloads -> Search
+        // 2. User switches tabs: Search -> Library -> Search
         val nav = NavigationHarness(Screen.Search.route)
         nav.navigateTab(Screen.Library.route)
         assertEquals("library", nav.currentDestination)
 
-        nav.navigateTab(Screen.Downloads.route)
-        assertEquals("downloads", nav.currentDestination)
+        nav.navigateToDetail(Screen.Settings.route)
+        assertEquals("settings", nav.currentDestination)
+        nav.popBackStack()
+        assertEquals("library", nav.currentDestination)
 
         nav.navigateTab(Screen.Search.route)
         assertEquals("search", nav.currentDestination)
@@ -677,7 +681,7 @@ class AdversarialM4AlbumAndNavigationChallengeTest {
         val allDestinations = listOf(
             Screen.Search.route,
             Screen.Library.route,
-            Screen.Downloads.route,
+            Screen.Settings.route,
             Screen.Artist.createRoute("art_dp"),
             Screen.Album.createRoute("alb_ram"),
         )

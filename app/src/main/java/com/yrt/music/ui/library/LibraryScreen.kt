@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 
 package com.yrt.music.ui.library
 
@@ -37,13 +37,14 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +54,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TriStateCheckbox
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -132,6 +136,7 @@ fun LibraryScreen(
     contentPadding: PaddingValues,
     onPlay: (List<Song>, Int) -> Unit,
     onDeleted: (Song) -> Unit,
+    onNavigateToSettings: () -> Unit = {},
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val all = state.all
@@ -172,63 +177,81 @@ fun LibraryScreen(
         expanded = if (group.name in expanded) expanded - group.name else expanded + group.name
     }
 
+    val pullToRefreshState = rememberPullToRefreshState()
+
     Box(Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 24.dp),
-        ) {
-            item(key = "header", contentType = "header") {
-                LibraryHeader(
-                    topPadding = contentPadding.calculateTopPadding(),
-                    songCount = all.size,
-                    artistCount = state.artistCount,
-                    totalMs = state.totalMs,
-                    onRefresh = vm::refresh,
-                    onPlayAll = { if (songs.isNotEmpty()) onPlay(groups.flatMap { it.songs }, 0) },
-                    onShuffle = { if (songs.isNotEmpty()) onPlay(songs.shuffled(), 0) },
-                    canPlay = songs.isNotEmpty(),
+        PullToRefreshBox(
+            isRefreshing = vm.isRefreshing,
+            onRefresh = { if (!selecting) vm.refresh() },
+            state = pullToRefreshState,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = vm.isRefreshing,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = contentPadding.calculateTopPadding()),
                 )
-            }
-            item(key = "search", contentType = "search") {
-                SearchField(query) { vm.query = it }
-            }
-            if (groups.isEmpty()) {
-                item(key = "empty", contentType = "empty") {
-                    EmptyState(libraryEmpty = all.isEmpty())
+            },
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 24.dp),
+            ) {
+                item(key = "header", contentType = "header") {
+                    LibraryHeader(
+                        topPadding = contentPadding.calculateTopPadding(),
+                        songCount = all.size,
+                        artistCount = state.artistCount,
+                        totalMs = state.totalMs,
+                        onSettingsClick = onNavigateToSettings,
+                        onPlayAll = { if (songs.isNotEmpty()) onPlay(groups.flatMap { it.songs }, 0) },
+                        onShuffle = { if (songs.isNotEmpty()) onPlay(songs.shuffled(), 0) },
+                        canPlay = songs.isNotEmpty(),
+                    )
                 }
-            }
-            items(rows, key = { it.key }, contentType = { if (it is LibraryRow.Artist) "artist" else "song" }) { row ->
-                when (row) {
-                    is LibraryRow.Artist -> {
-                        val group = row.group
-                        ArtistHeaderRow(
-                            group = group,
-                            isOpen = row.isOpen,
-                            hasCurrent = currentMediaId != null && group.songs.any { it.id == currentMediaId },
-                            selecting = selecting,
-                            selectedCount = if (selecting) group.songs.count { it.id in selectedIds } else 0,
-                            onToggle = { toggleExpanded(group) },
-                            onPlayArtist = { onPlay(group.songs, 0) },
-                            onToggleGroup = { toggleGroup(group) },
-                            modifier = Modifier.animateItem(),
-                        )
+                item(key = "search", contentType = "search") {
+                    SearchField(query) { vm.query = it }
+                }
+                if (groups.isEmpty()) {
+                    item(key = "empty", contentType = "empty") {
+                        EmptyState(libraryEmpty = all.isEmpty())
                     }
-                    is LibraryRow.SongItem -> {
-                        val song = row.song
-                        SongRow(
-                            song = song,
-                            featuring = row.group.featuring[song.id].orEmpty(),
-                            isCurrent = song.id == currentMediaId,
-                            isLast = row.isLast,
-                            selecting = selecting,
-                            isSelected = song.id in selectedIds,
-                            onClick = {
-                                if (selecting) toggleSong(song) else onPlay(row.group.songs, row.index)
-                            },
-                            onLongClick = { toggleSong(song) },
-                            onDelete = { pendingDelete = song },
-                            modifier = Modifier.animateItem(),
-                        )
+                }
+                items(rows, key = { it.key }, contentType = { if (it is LibraryRow.Artist) "artist" else "song" }) { row ->
+                    when (row) {
+                        is LibraryRow.Artist -> {
+                            val group = row.group
+                            ArtistHeaderRow(
+                                group = group,
+                                isOpen = row.isOpen,
+                                hasCurrent = currentMediaId != null && group.songs.any { it.id == currentMediaId },
+                                selecting = selecting,
+                                selectedCount = if (selecting) group.songs.count { it.id in selectedIds } else 0,
+                                onToggle = { toggleExpanded(group) },
+                                onPlayArtist = { onPlay(group.songs, 0) },
+                                onToggleGroup = { toggleGroup(group) },
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
+                        is LibraryRow.SongItem -> {
+                            val song = row.song
+                            SongRow(
+                                song = song,
+                                featuring = row.group.featuring[song.id].orEmpty(),
+                                isCurrent = song.id == currentMediaId,
+                                isLast = row.isLast,
+                                selecting = selecting,
+                                isSelected = song.id in selectedIds,
+                                onClick = {
+                                    if (selecting) toggleSong(song) else onPlay(row.group.songs, row.index)
+                                },
+                                onLongClick = { toggleSong(song) },
+                                onDelete = { pendingDelete = song },
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
                     }
                 }
             }
@@ -350,7 +373,7 @@ private fun LibraryHeader(
     artistCount: Int,
     totalMs: Long,
     canPlay: Boolean,
-    onRefresh: () -> Unit,
+    onSettingsClick: () -> Unit,
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
 ) {
@@ -391,8 +414,8 @@ private fun LibraryHeader(
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
-            IconButton(onClick = onRefresh) {
-                Icon(Icons.Default.Refresh, "Yenile", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            IconButton(onClick = onSettingsClick) {
+                Icon(Icons.Default.Settings, "Ayarlar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -482,7 +505,7 @@ private fun EmptyState(libraryEmpty: Boolean) {
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            if (libraryEmpty) "\"İndir\" sekmesinden veya Keşfet'ten şarkı ekle." else "Farklı bir arama dene.",
+            if (libraryEmpty) "Keşfet'ten şarkı ekle." else "Farklı bir arama dene.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
